@@ -1,4 +1,6 @@
 import { ApolloServer } from "apollo-server";
+import fs from "fs";
+import path from "path";
 
 let links = [
     {
@@ -8,33 +10,45 @@ let links = [
     },
 ];
 
-const typeDefs = `
-type Query {
-  info: String!
-  feed: [Link!]!
-}
-
-type Link {
-    id: ID!
-    description: String!
-    url: String!
-}
-`;
+let totalLinks = links.length;
 
 const resolvers = {
     Query: {
         info: () => "This clone of hackernews",
         feed: () => links,
     },
-    // Link: {
-    //     id: (parent) => parent.id,
-    //     description: (parent) => parent.description,
-    //     url: (parent) => parent.url,
-    // } Just to understand under the hood,
+    Mutation: {
+        post: (parent, args) => {
+            const link = {
+                id: `link-${totalLinks++}`,
+                description: args.description,
+                url: args.url,
+            };
+            links.push(link);
+            return link;
+        },
+        update: (parent, args) => {
+            const selectedLink = links.find(({ id }) => id === args.id);
+
+            if (!selectedLink) throw new Error("Field not found");
+
+            selectedLink.url = args.url;
+            selectedLink.description = args.description;
+            return selectedLink;
+        },
+        delete: (parent, args) => {
+            const selectedLinkIndex = links.findIndex(({ id }) => id === args.id);
+
+            if (selectedLinkIndex === -1) throw new Error("Field not found");
+
+            const deletedLink = links.splice(selectedLinkIndex, 1)[0];
+            return deletedLink;
+        },
+    },
 };
 
 const server = new ApolloServer({
-    typeDefs,
+    typeDefs: fs.readFileSync(path.join(__dirname, "schema.graphql"), "utf8"),
     resolvers,
 });
 

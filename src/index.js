@@ -1,48 +1,43 @@
 import { ApolloServer } from "apollo-server";
+import { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 
-let links = [
-    {
-        id: "link-0",
-        url: "www.howtographql.com",
-        description: "Fullstack tutorial for GraphQL",
-    },
-];
-
-let totalLinks = links.length;
+const prisma = new PrismaClient();
 
 const resolvers = {
     Query: {
         info: () => "This clone of hackernews",
-        feed: () => links,
+        feed: async (parent, args, context) => await context.prisma.link.findMany(),
     },
     Mutation: {
-        post: (parent, args) => {
-            const link = {
-                id: `link-${totalLinks++}`,
-                description: args.description,
-                url: args.url,
-            };
-            links.push(link);
-            return link;
+        post: async (parent, args) => {
+            const newLink = await context.prisma.link.create({
+                data: {
+                    description: args.description,
+                    url: args.url,
+                },
+            });
+            return newLink;
         },
-        update: (parent, args) => {
-            const selectedLink = links.find(({ id }) => id === args.id);
-
-            if (!selectedLink) throw new Error("Field not found");
-
-            selectedLink.url = args.url;
-            selectedLink.description = args.description;
-            return selectedLink;
+        update: async (parent, args, context) => {
+            const updatedLink = await context.prisma.link.update({
+                where: {
+                    id: +args.id,
+                },
+                data: {
+                    url: args.url,
+                    description: args.description,
+                },
+            });
+            return updatedLink;
         },
-        delete: (parent, args) => {
-            const selectedLinkIndex = links.findIndex(({ id }) => id === args.id);
-
-            if (selectedLinkIndex === -1) throw new Error("Field not found");
-
-            const deletedLink = links.splice(selectedLinkIndex, 1)[0];
-            return deletedLink;
+        delete: async (parent, args, context) => {
+            return await context.prisma.link.delete({
+                where: {
+                    id: +args.id,
+                },
+            });
         },
     },
 };
@@ -50,6 +45,9 @@ const resolvers = {
 const server = new ApolloServer({
     typeDefs: fs.readFileSync(path.join(__dirname, "schema.graphql"), "utf8"),
     resolvers,
+    context: {
+        prisma,
+    },
 });
 
 server.listen().then(({ url }) => console.log(`Server is running in ${url}`));

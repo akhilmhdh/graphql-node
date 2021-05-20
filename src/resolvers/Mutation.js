@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { APP_SECRET, getUserId } from "../utils";
 
 const signup = async (parent, args, context, info) => {
-    const password = await bcrypt.hash(args.password);
+    const password = await bcrypt.hash(args.password, 10);
 
     const user = await context.prisma.user.create({ data: { ...args, password } });
 
@@ -49,6 +49,18 @@ const createPost = async (parent, args, context) => {
 };
 
 const updatePost = async (parent, args, context) => {
+    const { userId } = context;
+    const fetchUserLink = await context.prisma.link.findFirst({
+        where: {
+            id: +args.id,
+            postedById: +userId,
+        },
+    });
+
+    if (!fetchUserLink) {
+        throw new Error("Unauthorized access");
+    }
+
     const updatedLink = await context.prisma.link.update({
         where: {
             id: +args.id,
@@ -62,6 +74,17 @@ const updatePost = async (parent, args, context) => {
 };
 
 const deletePost = async (parent, args, context) => {
+    const { userId } = context;
+    const fetchUserLink = await context.prisma.link.findFirst({
+        where: {
+            id: +args.id,
+            postedById: +userId,
+        },
+    });
+
+    if (!fetchUserLink) {
+        throw new Error("Unauthorized access");
+    }
     return await context.prisma.link.delete({
         where: {
             id: +args.id,

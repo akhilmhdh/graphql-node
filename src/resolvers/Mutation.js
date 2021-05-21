@@ -45,6 +45,8 @@ const createPost = async (parent, args, context) => {
             postedBy: { connect: { id: userId } },
         },
     });
+
+    context.pubsub.publish("NEW_LINK", newLink);
     return newLink;
 };
 
@@ -92,10 +94,39 @@ const deletePost = async (parent, args, context) => {
     });
 };
 
+export const vote = async (parent, args, context) => {
+    const userId = getUserId(context);
+
+    const fetchExistingVote = await context.prisma.vote.findUnique({
+        where: {
+            linkId_userId: {
+                linkId: +args.linkId,
+                userId: userId,
+            },
+        },
+    });
+
+    if (Boolean(fetchExistingVote)) {
+        throw new Error(`Already voted for link: ${args.linkId}`);
+    }
+
+    const newVote = await context.prisma.vote.create({
+        data: {
+            user: { connect: { id: userId } },
+            link: { connect: { id: +args.linkId } },
+        },
+    });
+
+    context.pubsub.publish("NEW_VOTE", newVote);
+
+    return newVote;
+};
+
 export default {
     signup,
     login,
     createPost,
     updatePost,
     deletePost,
+    vote,
 };
